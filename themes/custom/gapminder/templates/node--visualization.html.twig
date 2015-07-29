@@ -1,0 +1,135 @@
+<style>#page-title{display:none}</style>
+{% if page.sidebar_first %}
+    <div class="fc-content-left">
+{% endif %}      
+<div class="page-conatiner fc">
+        <div class="fc-heading-1">
+        {{ label }}
+        </div>
+        <div class="fc-sub-heading">
+        {{ content.field_factpod_number }}
+        </div>
+        <div style="width: 100%; height: 500px;float: left" id="vizabi-chart"></div>  
+        <div class="fc-left-part">                      
+            <div class="fc-content-part">
+            {{ content.body }}
+            </div>
+        </div>
+        <div class="fc-right-part">
+            <div class="a2a_kit">
+                <h2 class="heading-4">{{ 'Share'|t }}</h2>
+                <a class="a2a_button_facebook"> <img alt="Facebook" border="0" src="{{ base_url }}/themes/custom/gapminder/images/facebook.png" width="32" /> </a>
+                <a class="a2a_button_twitter"> <img alt="Twitter" border="0" src="{{ base_url }}/themes/custom/gapminder/images/twitter.png" width="32" /> </a>
+                <a class="a2a_button_google_plus"> <img alt="Google+" border="0" src="{{ base_url }}/themes/custom/gapminder/images/message.png" width="32" /> </a>
+                <a class="a2a_dd" href="http://www.addtoany.com/share_save"> <img alt="Share" border="0" src="{{ base_url }}/themes/custom/gapminder/images/more.png" width="32" /> </a>
+            </div>   
+            {% if not user_pictures is empty %}
+                <div class="fc-contributors">
+                    <h2 class="heading-4">{{ 'Thanks'|t }} {{ 'to'|t }}</h2>
+                        {% for key,value in user_pictures %}
+                            <a href="{{ base_url }}/user/{{ key }}"><img src="{{ value }}" height="28" width="28"></a>
+                            
+                        {% endfor %}
+                </div>
+            {% endif %}            
+        </div>       
+</div>
+{% if page.sidebar_first %}
+    </div>
+    <div id="sidebar-second" class="fc-content-right">
+        {{ page.sidebar_first }}
+    </div>
+{% endif %}  
+<div class="overlay_img"><img src="{{ overlayimg }}"></div>
+<input type="hidden" id="state-tags">
+<script src="{{ VizabiJqueryMin }}"></script>        
+<script src="{{ VizabiJs }}"></script>    
+<script src="{{ VizabiScripts }}"></script>        
+<link rel="stylesheet" href="{{ VizabiCss }}">
+<script>
+    var myVizabi;
+    $(function() 
+    {   
+        myVizabi = new Vizabi("{{tooltype}}", "#vizabi-chart",{bind: 
+        {
+        'ready': function() {
+          // console.log('Vizabi is ready!');
+        },
+        'change:state:entities:select': function(evt, vals) {
+                var SelectedState='';
+                var SelectedLanguage = vals['language']['id'];
+                var nid = {{nodenid}}
+                if(vals['state']['entities']['brush']['0']['geo'])
+                {
+                  SelectedState = vals['state']['entities']['brush']['0']['geo']; 
+                }
+                if(SelectedState!='')
+                {
+                    var tag_exist=jQuery('#state-tags').val();
+                    if(tag_exist!='')
+                    {
+                       if (tag_exist.indexOf(SelectedState) >= 0)
+                       {
+                           
+                       }
+                       else
+                       {
+                            var tags=  tag_exist+","+SelectedState;
+                            jQuery('#state-tags').val(tags); 
+                       }
+                    }   
+                    else
+                    {
+                       jQuery('#state-tags').val(SelectedState); 
+                    }
+                }
+                SelectedState=jQuery('#state-tags').val();
+                
+                /**************** Overlay For Ajax *******************/
+                jQuery('.overlay').show();
+                jQuery('.overlay_img').show();
+                /**************** End Overlay For Ajax *******************/
+                      $.ajax({
+                           type: 'POST',
+                           url: "{{ base_url }}"+"/custom_api",
+                           data: 
+                               {
+                                state: SelectedState,
+                                nid:nid,
+                                SelectedLanguage:SelectedLanguage
+                               },
+                           success:function(res){
+                                 var html='';
+                               jQuery(res).each(function(e,content){
+                                 
+                                   if(content.result && content.result=='failure')
+                                   {
+                                     html='No Results';
+                                   }
+                                   else
+                                   {
+                                    var title=content.title;
+                                    var href=content.href;
+                                    var url=content.image_url;   
+                                    var subtitle=content.subtitle;    
+                                     html +='<div class="viewdata views-row">\n\
+                        <div class="views-field views-field-nothing">\n\
+<span class="field-content">\n\
+<div class="fc_rows related"><div class="fc_image related"><a href="'+href+'"><img width="130" height="78" src="'+url+'"></a></div>\n\
+<div class="fc_title_sub related"><div class="fc_title related"><a href="'+href+'">'+title+'</a></div><div class="fc_sub related">\n\
+ <a href="'+href+'">'+subtitle+'</a> </div></div></div></span></div></div>';
+                                   }                                   
+                               });
+                               
+                                jQuery('.view-id-visualization .view-content').html(html);
+                                jQuery('.overlay').hide();
+                                jQuery('.overlay_img').hide();                                
+                                },
+                            dataType: "json",
+                           
+                          });      
+            },
+         }} 
+        );  
+    });
+</script>

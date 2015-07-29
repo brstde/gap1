@@ -1,0 +1,433 @@
+<?php
+
+/**
+ * @file
+ * Functions to support theming in the Bartik theme.
+ */
+
+use Drupal\Component\Utility\String;
+use Drupal\Component\Utility\Xss;
+use Drupal\Core\Template\Attribute;
+use Symfony\Component\HttpFoundation\JsonResponse;
+use Drupal\views\Plugin\views\filter\Standard;
+use Drupal\views\Views;
+/**
+ * Implements hook_preprocess_HOOK() for HTML document templates.
+ *
+ * Adds body classes if certain regions have content.
+ */
+function gapminder_preprocess_html(&$variables) {
+  // Add information about the number of sidebars.
+  if (!empty($variables['page']['sidebar_first']) && !empty($variables['page']['sidebar_second'])) {
+    $variables['attributes']['class'][] = 'layout-two-sidebars';
+  }
+  elseif (!empty($variables['page']['sidebar_first'])) {
+    $variables['attributes']['class'][] = 'layout-one-sidebar';
+    $variables['attributes']['class'][] = 'layout-sidebar-first';
+  }
+  elseif (!empty($variables['page']['sidebar_second'])) {
+    $variables['attributes']['class'][] = 'layout-one-sidebar';
+    $variables['attributes']['class'][] = 'layout-sidebar-second';
+  }
+  else {
+    $variables['attributes']['class'][] = 'layout-no-sidebars';
+  }
+
+  if (!empty($variables['page']['featured_top'])) {
+    $variables['attributes']['class'][] = 'has-featured-top';
+  }
+
+}
+
+/**
+ * Implements hook_preprocess_HOOK() for page templates.
+ */
+function gapminder_preprocess_page(&$variables) {
+    global $base_url;    
+    $RequestUri = \Drupal::request()->getRequestUri();    
+    $current_path = \Drupal::service('path.current')->getPath();
+    $Path = trim($current_path, '/');
+    
+    $CurrentLanguage=\Drupal::languageManager()->getCurrentLanguage()->getId();
+    $DefaultLanguage=\Drupal::languageManager()->getDefaultLanguage()->getId();      
+    
+    //$result = \Drupal::service('path.alias_manager')->getAliasByPath(trim($current_path, '/'));  
+    
+    $languages = \Drupal::languageManager()->getLanguages();
+    
+    $Options='<select name="langselect" id="langselect" class="langselect">';
+    foreach ($languages as $key=>$language)
+    {
+        $selected='';
+        $LanguageName=$language->getName();
+        $LanguageId=$language->getId();        
+        $Url = db_select('url_alias', 'menu')
+                  ->fields('menu',array('alias'))
+                  ->condition('langcode',$LanguageId,'=') 
+                  ->condition('source',$Path,'=') 
+                  ->execute()
+                  ->fetchField();  
+        $LangUrl=$base_url."/".$LanguageId."/".$Path;      
+        if($DefaultLanguage==$LanguageId)
+        {
+           $LangUrl=$base_url."/".$Path;  
+        }
+        if($Url!='' && !empty($Url))
+        {
+          $LangUrl=$base_url."/".$LanguageId."/".$Url;
+            if($DefaultLanguage==$LanguageId)
+            {
+               $LangUrl=$base_url."/".$Url;  
+            }          
+        }
+        if($CurrentLanguage==$LanguageId){$selected='selected';}
+        $Options.='<option value="'.$LangUrl.'" '.$selected.'>'.$LanguageName.'</option>';
+    }
+    $Options.='</select>';
+    $variables['LangDropdown']=$Options;
+    $variables['base_url']=$base_url;
+    $variables['main_child_menu']='';
+    $variables['allpages']='allpages';
+//    $menu_tree = \Drupal::menuTree();
+//    $menu_name = 'main';
+//
+//    // Build the typical default set of menu tree parameters.
+//    $parameters = $menu_tree->getCurrentRouteMenuTreeParameters($menu_name);
+//
+//    // Load the tree based on this set of parameters.
+//    $tree = $menu_tree->load($menu_name, $parameters);
+//
+//    // Transform the tree using the manipulators you want.
+//    $manipulators = array(
+//      // Only show links that are accessible for the current user.
+//      array('callable' => 'menu.default_tree_manipulators:checkAccess'),
+//      // Use the default sorting of menu links.
+//      array('callable' => 'menu.default_tree_manipulators:generateIndexAndSort'),
+//    );
+//    $tree = $menu_tree->transform($tree, $manipulators);
+//
+//    // Finally, build a renderable array from the transformed tree.
+//    $menu = $menu_tree->build($tree);
+//    $menu_html = drupal_render($menu);
+//    if ((strpos($RequestUri,'answers') !== false) || ((strpos($RequestUri,'factpod') !== false)) || (((strpos($RequestUri,'node/14') !== false))))
+//    {
+//        $variables['main_child_menu']= $menu_html;
+//    }
+  // Set the options that apply to both page and maintenance page.
+  _gapminder_process_page($variables);
+
+  // Since the title and the shortcut link are both block level elements,
+  // positioning them next to each other is much simpler with a wrapper div.
+  if (!empty($variables['title_suffix']['add_or_remove_shortcut']) && $variables['title']) {
+    // Add a wrapper div using the title_prefix and title_suffix render
+    // elements.
+    $variables['title_prefix']['shortcut_wrapper'] = array(
+      '#markup' => '<div class="shortcut-wrapper clearfix">',
+      '#weight' => 100,
+    );
+    $variables['title_suffix']['shortcut_wrapper'] = array(
+      '#markup' => '</div>',
+      '#weight' => -99,
+    );
+    // Make sure the shortcut link is the first item in title_suffix.
+    $variables['title_suffix']['add_or_remove_shortcut']['#weight'] = -100;
+  }
+  
+  /********************************* Related Items For Factpod And Answers Node ****************************************/
+  if((isset($variables['node']->type->target_id)) && ((strpos($RequestUri,'translations') == false)) && ($variables['node']->type->target_id=="answers" || $variables['node']->type->target_id=="factpod" || $variables['node']->type->target_id=="test_questions"
+           || $variables['node']->type->target_id=="answers_slideshows" || $variables['node']->type->target_id=="slideshows"))
+  {
+      $view = Views::getView('related');      
+      if(isset($variables['node']->field_tag->target_id))
+      {
+        $TagId = $variables['node']->field_tag->target_id;
+        $variables['related'] = $view->preview('default', $TagId );            
+      }  
+      else
+      {
+         $variables['related'] = 'No Results'; 
+      }
+  }     
+  /**************************** End Of Related Items For Factpod And Answers Node **************************************/  
+  
+  /**************************** Calling Block **************************************/    
+    $block = \Drupal\block\Entity\Block::load('mobileheader');
+    $variables['mobile_header_logo'] = \Drupal::entityManager()
+      ->getViewBuilder('block')
+      ->view($block);  
+  /**************************** End of Calling **************************************/   
+}
+
+/**
+ * Implements hook_preprocess_HOOK() for maintenance-page.html.twig.
+ */
+function gapminder_preprocess_maintenance_page(&$variables) {
+  // By default, site_name is set to Drupal if no db connection is available
+  // or during site installation. Setting site_name to an empty string makes
+  // the site and update pages look cleaner.
+  // @see template_preprocess_maintenance_page
+  if (!$variables['db_is_active']) {
+    $variables['site_name'] = '';
+  }
+
+  // Bartik has custom styling for the maintenance page.
+  $variables['#attached']['library'][] = 'gapminder/maintenance_page';
+
+  // Set the options that apply to both page and maintenance page.
+  _gapminder_process_page($variables);
+}
+
+/**
+ * Implements hook_preprocess_HOOK() for node.html.twig.
+ */
+function gapminder_preprocess_node(&$variables) {
+  // Remove the "Add new comment" link on teasers or when the comment form is
+  // displayed on the page.
+   global $base_url;
+   $variables['base_url']=$base_url;
+   $variables['overlayimg']=$base_url.'/themes/custom/gapminder/images/opc-ajax-loader.gif';
+//echo "<pre>";
+//print_r($variables);
+//echo "</pre>";
+ 
+  if ($variables['teaser'] || !empty($variables['content']['comments']['comment_form'])) 
+    {
+        unset($variables['content']['links']['comment']['#links']['comment-add']);
+    }
+if (($node = \Drupal::routeMatch()->getParameter('node')) && $node instanceof \Drupal\node\NodeInterface) 
+    {
+        $languages = \Drupal::languageManager()->getLanguages();
+        $AllLanguages=count($languages);
+        $variables['nodenid']=$node->nid->value;
+        $variables['nodehtml']='';
+//        if($node->nid->value==25)
+//        {
+//            $result = db_query('SELECT * FROM `node` as n LEFT JOIN node_field_data as nd ON n.nid=nd.nid AND n.nid!=25');
+//            $items = array();
+//            foreach ($result as $item) 
+//               {
+//                $items[$item->nid] ++;
+//               }                    
+//            $NodeHtml="";
+//            if(!empty($items))
+//            {
+//                $NodeHtml .="<h1>Nodes need to be translated</h1>";
+//                foreach($items as $key=>$allitems)
+//                {
+//                    if($allitems < $AllLanguages)
+//                    {
+//                        $LoadNode = node_load($key);
+//                        $Title = $LoadNode->title->value;
+//                        $link = $base_url.'/node/'.$key.'/translations';
+//                        $NodeHtml .= "<div class='per-row'>";
+//                        $NodeHtml .= "<a href='".$link."'>$Title</a>";
+//                        $NodeHtml .= "</div>";
+//                    }
+//                }
+//            }
+//            
+//            $MenuLinks = db_query('SELECT count(*) as count, id , title FROM `menu_link_content_data` group by id');
+//            if(!empty($MenuLinks))
+//            {
+//                $NodeHtml .="<h1>Menu Links need to be translated</h1>";
+//                foreach ($MenuLinks as $MenuItem) 
+//                   {
+//                       $ItemCount = $MenuItem->count;
+//                       if($ItemCount < $AllLanguages)
+//                       {
+//                            $Title = $MenuItem->title;
+//                            $Id = $MenuItem->id;
+//                            $link = $base_url.'/admin/structure/menu/item/'.$Id.'/edit/translations';
+//                            $NodeHtml .= "<div class='per-row'>";
+//                            $NodeHtml .= "<a href='".$link."'>$Title</a>";
+//                            $NodeHtml .= "</div>";
+//                       }
+//                   }     
+//            }            
+//            $NodeHtml=format_string($NodeHtml);
+//            $variables['nodehtml'] = $NodeHtml;
+//        }
+        if($node->type->target_id=="visualization")
+        {
+            $variables['tooltype'] = $node->field_tool_type->value;    
+            $variables['state'] = $node->field_state->value;
+            $variables['language'] = $node->field_language->value;
+            $variables['VizabiJqueryMin'] ="http://static.gapminderdev.org/vizabi/develop/preview_pages/assets/jquery.min.js";
+            $variables['VizabiJs'] = "http://static.gapminderdev.org/vizabi/develop/vizabi.js";
+            $variables['VizabiScripts'] = "http://static.gapminderdev.org/vizabi/develop/preview_pages/assets/scripts.js";
+            $variables['VizabiCss'] = "http://static.gapminderdev.org/vizabi/develop/vizabi.css";            
+        }
+        else
+        {
+            $total_values=count($node->field_contributors);
+            $UserPicture=array();
+            for($i=0;$i<$total_values;$i++)
+            {
+               $uid=$node->field_contributors[$i]->target_id; 
+               $ContribLoad=user_load($uid);
+               if(isset($ContribLoad->user_picture->entity))
+               {
+                    $ImageSrc=$ContribLoad->user_picture->entity->url(); 
+                    $UserPicture[$uid]=$ImageSrc;
+                   // $UserPicture.='<img src="'.$ImageSrc.'" width="28" height="28">';
+               }
+            }
+            $variables['user_pictures']=$UserPicture;
+            $variables['video_url']='';
+            if(isset($node->field_video_url->value) && ($node->field_video_url->value))
+            {
+                $GetHost = parse_url($node->field_video_url->value);            
+                if(isset($GetHost['host']) && (strpos($GetHost['host'],'vimeo') !== false))
+                {
+                    $variables['video_class']='vimeo';  
+                }
+                else
+                {
+                    $variables['video_class']='other';    
+                }
+                $variables['video_url']=$node->field_video_url->value;
+                $variables['node_date_time']=date("M d, Y",$variables['node']->getCreatedTime());    
+            }
+        }
+    }  
+}
+
+/**
+ * Implements hook_preprocess_HOOK() for block.html.twig.
+ */
+function gapminder_preprocess_block(&$variables) {
+  // Add a clearfix class to system branding blocks.
+//    $User=\Drupal::currentUser();
+//    if(in_array('translator',$User->getRoles()))
+//    {
+//            $variables['attributes']['login']=1;
+//    }
+  if ($variables['plugin_id'] == 'system_branding_block') {
+    $variables['attributes']['class'][] = 'clearfix';
+  }
+}
+
+/**
+ * Implements hook_preprocess_HOOK() for menu.html.twig.
+ */
+function gapminder_preprocess_menu(&$variables) {
+  $variables['attributes']['class'][] = 'clearfix';
+}
+
+/**
+ * Helper function for handling the site name and slogan.
+ */
+function _gapminder_process_page(&$variables) {
+  $site_config = \Drupal::config('system.site');
+  // Always print the site name and slogan, but if they are toggled off, we'll
+  // just hide them visually.
+  $variables['hide_site_name']   = theme_get_setting('features.name') ? FALSE : TRUE;
+  $variables['hide_site_slogan'] = theme_get_setting('features.slogan') ? FALSE : TRUE;
+  if ($variables['hide_site_name']) {
+    // If toggle_name is FALSE, the site_name will be empty, so we rebuild it.
+    $variables['site_name'] = String::checkPlain($site_config->get('name'));
+  }
+  if ($variables['hide_site_slogan']) {
+    // If toggle_site_slogan is FALSE, the site_slogan will be empty, so we
+    // rebuild it.
+    $variables['site_slogan'] = Xss::filterAdmin($site_config->get('slogan'));
+  }
+}
+
+
+function gapminder_preprocess_user(&$variables) {
+    global $base_url;
+    $variables['base_url']=$base_url;    
+    //$user = \Drupal\user\Entity\User::load();
+    $CurrentUser =\Drupal::service('path.current')->getPath();
+    $ExplodeUser=explode('/',$CurrentUser);
+    $uid=end($ExplodeUser);
+    if(is_numeric($uid))
+    {
+        $userload=user_load($uid);
+        if($userload->field_facebook->value)
+        {
+         $variables['facebook']=$userload->field_facebook->value;  
+        }
+        if($userload->field_linkedin->value)
+        {
+         $variables['linkedin']=$userload->field_linkedin->value;  
+        }
+        if($userload->field_twitter->value)
+        {
+         $variables['twitter']=$userload->field_twitter->value;  
+        }
+        if($userload->field_instagram->value)
+        {
+         $variables['instagram']=$userload->field_instagram->value;  
+        }        
+    }
+}
+
+function gapminder_preprocess_taxonomy_term(&$variables) {
+    global $base_url;
+    $User=\Drupal::currentUser();
+    if(in_array('translator',$User->getRoles()))
+    {
+        if(isset($variables['attributes']['data-custom-entity-id']))
+        {
+            $variables['attributes']['taxotranslate']= $base_url."/taxonomy/term/".$variables['attributes']['data-custom-entity-id']."/translations";
+        }
+    }
+}
+function gapminder_page_attachments_alter(array &$page)
+{
+// $viewport = array(
+//      '#tag' => 'meta',
+//      '#attributes' => array(
+//        'name' => 'description',
+//        'content' => 'Manish Jain',
+//      ),
+//    );    
+// $viewport1 = array(
+//      '#tag' => 'meta',
+//      '#attributes' => array(
+//        'name' => 'keywords',
+//        'content' => 'Manish,Jain',
+//      ),
+//    );   
+// $viewport2 = array(
+//      '#tag' => 'meta',
+//      '#attributes' => array(
+//        'name' => 'author',
+//        'content' => 'Manish Jain',
+//      ),
+//    );   
+//    $page['#attached']['html_head'][] = [$viewport, 'description'];    
+//    $page['#attached']['html_head'][] = [$viewport1, 'keywords']; 
+//    $page['#attached']['html_head'][] = [$viewport2, 'author']; 
+//  echo "<pre>";
+//  print_r($page);
+//  echo "</pre>";
+//  die('here');
+// $viewport = array(
+//      '#tag' => 'meta',
+//      '#attributes' => array(
+//        'name' => 'description',
+//        'content' => 'manish jain',
+//      ),
+//    );    
+//    $page['#attached']['html_head'][] = $viewport;
+}
+
+function gapminder_languageswitcher($links) {
+  //called to compare current language and selected option
+  global $language;
+  
+  $output = '<div class="language-form">'. t('Select a language') .'</div>';
+  $output .= '<form name="language-form">';
+  $output .= '<select id="language-interface" onchange="window.location.href=this.options[this.selectedIndex].value;">';
+  foreach($links as $link) {
+    $output .= '<option value="'. $link['path'] . '"'.  ($link['language'] == $language->language ? ' selected="selected"' : '') .'>';
+    $output .= $link['text'];
+    $output .= '</option>';
+  }
+  $output .= "</select>";
+  $output .= "</form>";
+  return $output;
+}

@@ -1,0 +1,55 @@
+<style>#page-title{display:none}</style>
+<div class="profile-user">
+    <div class="fc-user left">
+        {% if content.user_picture %}           
+        <div class="fc-user-picture">
+            {{ content.user_picture }}
+        </div>
+        {% endif %}            
+        {% if content.field_contribution %}        
+        <div class="fc-user-contrib">
+            {{ content.field_contribution }}            
+        </div>
+        {% endif %}         
+    </div>
+    <div class="fc-user right">
+        {% if content.field_first_name %}
+        <div class="fc-user-fullname">
+            {{ content.field_first_name }}
+            {{ content.field_last_name  }}
+        </div>
+        {% endif %} 
+        <div class="fc-user-social-icons">
+        {% if facebook %}             
+                <a class="facebook" href="{{ facebook }}" target="_blank"> <img alt="Facebook" border="0" src="{{ base_url }}/themes/custom/gapminder/images/facebook-logo-100x100.png" width="25" /> </a>
+        {% endif %}                  
+        {% if linkedin %}                 
+                <a class="linkedin" href="{{ linkedin }}" target="_blank"> <img alt="linkedin" border="0" src="{{ base_url }}/themes/custom/gapminder/images/linkedin-logo-100x88.png" width="25" /> </a>
+        {% endif %}                  
+        {% if twitter %}                 
+                <a class="twitter" href="{{ twitter }}" target="_blank"> <img alt="twitter" border="0" src="{{ base_url }}/themes/custom/gapminder/images/twitter-logo-100x81.png" width="25" /> </a>
+        {% endif %}                  
+        {% if instagram %}                 
+                <a class="instagram" href="{{ instagram }}" target="_blank"> <img alt="instagram" border="0" src="{{ base_url }}/themes/custom/gapminder/images/Instagram_Icon_Large.png" width="25" /> </a>          
+        {% endif %}                  
+        </div>        
+        <div class="user-profession">
+            {{ content.field_profession }}
+        </div>
+        <div class="user-location">
+            {{ content.field_location }}
+        </div>
+        {% if content.field_about %}
+        <div class="user-about">
+            <h2 class="sir-trevor-title">{{ 'About me'|t }}</h2>    
+            {{ content.field_about }}
+        </div>
+        {% endif %}      
+        {% if content.field_links %}
+        <div class="user-links">
+            <h2 class="sir-trevor-title">{{ 'My Links'|t }}</h2>    
+            {{ content.field_links }}
+        </div>
+        {% endif %}     
+    </div>
+</div>
